@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "routes": [
+    {
+      "src": "/send-message",
+      "dest": "/api/proxy.js"
+    }
+  ]
+}
