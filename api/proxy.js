@@ -10,94 +10,38 @@ function delay(ms) {
 
 // --- VPN CHECK USING IPHUB OR IPAPI.CO --- //
 async function isVpn(ip) {
+    const API_KEY = "RL0uWsh9yOkmnmEGHgc48e8k7hwtPpuI";
+
     try {
-        const resp = await fetch(`https://ipapi.co/${ip}/json/`);
-        const data = await resp.json();
+        const response = await fetch(
+            `https://ipqualityscore.com/api/json/ip/${API_KEY}/${ip}`
+        );
 
-        if (!data || !data.asn) return true;
+        const data = await response.json();
 
-        const asn = parseInt(data.asn.replace("AS", ""), 10);
-        if (isNaN(asn)) return true;
-
-        // ---- MASSIVE U.S. RESIDENTIAL ISP ASN LIST ----
-        const allowedResidentialASNs = [
-
-            // Spectrum / Charter / Time Warner Cable
-            20115, 11351, 7843, 11426, 11427, 11425, 20001, 10796, 18881,
-
-            // Comcast / Xfinity
-            7922, 33657, 7016,
-
-            // Verizon FiOS
-            22394, 702,
-
-            // AT&T Internet (fiber/DSL)
-            7018, 20057, 6389, 7088,
-
-            // Cox Communications
-            22773, 12008, 7843,
-
-            // Frontier Communications
-            5650, 6167, 11492,
-
-            // CenturyLink / Lumen / Qwest
-            209, 3561, 20940, 22561,
-
-            // MediaCom
-            30036, 2156,
-
-            // WOW! Internet
-            12044, 12129,
-
-            // Cable ONE / Sparklight
-            11404, 20130,
-
-            // Optimum / Altice
-            6128, 11831, 22394,
-
-            // RCN / Astound
-            6079, 31364,
-
-            // HughesNet
-            6621, 41164,
-
-            // Starlink
-            14593,
-
-            // Google Fiber
-            15169,
-
-            // T-Mobile Home Internet
-            21928, 21949, 21995, 22394, 39589,
-
-            // Verizon Wireless
-            6167, 22394, 22351,
-
-            // AT&T Wireless
-            20057, 7018,
-
-            // US Cellular
-            16617,
-
-            // Regional Fiber ISPs
-            29873, 30693, 32097, 63296, 14618, 11398,
-
-            // Smaller Cable Co-ops
-            33650, 27431, 11486, 20562, 27431, 20348
-        ];
-
-        // Allow if ASN is in allowed list
-        if (allowedResidentialASNs.includes(asn)) {
+        // If API fails, assume safe (return false)
+        if (!data || data.success === false) {
+            console.log("IPQS lookup failed:", data?.message);
             return false;
         }
 
-        // Anything else = VPN / hosting / cloud
-        return true;
+        // IPQS flags
+        if (
+            data.proxy === true ||
+            data.vpn === true ||
+            data.tor === true ||
+            data.recent_abuse === true ||
+            data.fraud_score >= 75
+        ) {
+            return true;
+        }
 
     } catch (err) {
-        console.log("VPN check failed:", err);
-        return true;
+        console.log("IPQS error:", err);
+        return false; // Fail-safe
     }
+
+    return false;
 }
 
 async function processQueue() {
@@ -168,6 +112,7 @@ export default async function handler(req, res) {
     requestQueue.push({ req, res });
     processQueue();
 }
+
 
 
 
