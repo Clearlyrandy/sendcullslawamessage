@@ -11,20 +11,28 @@ function delay(ms) {
 // --- VPN CHECK USING IPHUB OR IPAPI.CO --- //
 async function isVpn(ip) {
     try {
-        // Free API with no key needed
-        const resp = await fetch(`https://ipapi.co/${ip}/json/`);
+        const resp = await fetch(
+            `https://check.getipintel.net/check.php?ip=${ip}&contact=test@example.com&flags=m`,
+            { method: "GET" }
+        );
 
-        const data = await resp.json();
-        // "proxy": true or "hosting": true means VPN/proxy/datacenter
-        if (data.proxy === true || data.hosting === true || data.asn && data.asn.startsWith("AS")) {
-            return true;
+        const result = await resp.text();
+
+        const score = parseFloat(result);
+
+        // API returns negative numbers on error
+        if (isNaN(score) || score < 0) {
+            console.log("IPIntel error, allowing request");
+            return false;
         }
+
+        // Score meaning:
+        // 0.90+ = VPN / Proxy / Hosting
+        return score >= 0.90;
     } catch (e) {
         console.log("VPN check failed:", e);
-        // If check fails, play it safe and treat it as suspicious
-        return true;
+        return false; // fail open (allow) to avoid false positives
     }
-    return false;
 }
 
 async function processQueue() {
@@ -95,3 +103,4 @@ export default async function handler(req, res) {
     requestQueue.push({ req, res });
     processQueue();
 }
+
