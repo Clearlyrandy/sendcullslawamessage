@@ -14,63 +14,45 @@ async function isVpn(ip) {
         const resp = await fetch(`https://ipapi.co/${ip}/json/`);
         const data = await resp.json();
 
-        if (!data || !data.asn) return false;
+        if (!data || !data.asn || !data.org) return true; // suspicious → block
 
-        const asn = data.asn.toUpperCase();
-        const org = (data.org || "").toUpperCase();
+        const org = data.org.toUpperCase();
 
-        // These keywords indicate datacenter hosting (NOT a home ISP)
-        const hostingKeywords = [
-            "HOSTING",
-            "VPN",
-            "DATACENTER",
-            "DATA CENTER",
-            "CLOUD",
-            "LLC",
-            "SERVICES",
-            "DIGITALOCEAN",
-            "AMAZON",
-            "AWS",
-            "GOOGLE",
-            "AZURE",
-            "MICROSOFT",
-            "OVH",
-            "M247",
-            "CHOOPA",
-            "LEASEWEB",
-            "FASTLY",
-            "LINODE",
-            "HETZNER"
+        // US residential ISPs (only allow these)
+        const residential = [
+            "COMCAST",
+            "XFINITY",
+            "SPECTRUM",
+            "CHARTER",
+            "COX",
+            "VERIZON",
+            "ATT",
+            "AT&T",
+            "CENTURYLINK",
+            "FRONTIER",
+            "WOW",
+            "OPTIMUM",
+            "ALTICE",
+            "RCN",
+            "MEDIACOM",
+            "HUGHES",
+            "VTEL",
+            "WINDSTREAM"
         ];
 
-        // If the ASN org contains these keywords → VPN/proxy/datacenter
-        for (const word of hostingKeywords) {
-            if (org.includes(word)) {
-                return true;
+        // If the IP's org name contains any residential ISP → ALLOW
+        for (const isp of residential) {
+            if (org.includes(isp)) {
+                return false; // not a VPN
             }
         }
 
-        // ProtonVPN specifically uses "M247 Ltd", "Datacamp Limited", "Acronis", "Steadfast", etc.
-        const protonProviders = [
-            "M247", 
-            "ACRONIS",
-            "DATACAMP",
-            "STEADFAST",
-            "ANEXIA",
-            "PRIVACY",  // used by some VPN operators
-            "PRIVATELAYER"
-        ];
+        // Anything else = VPN / hosting / proxy
+        return true;
 
-        for (const word of protonProviders) {
-            if (org.includes(word)) {
-                return true;
-            }
-        }
-
-        return false;
-    } catch (err) {
-        console.log("VPN check failed:", err);
-        return false;
+    } catch (e) {
+        console.log("VPN check error:", e);
+        return true; // error = block for safety
     }
 }
 
@@ -122,7 +104,7 @@ export default async function handler(req, res) {
 
     // --- VPN CHECK --- //
     if (await isVpn(ip)) {
-        return res.status(403).json({ error: "Are you using a VPN or Proxy?" });
+        return res.status(403).json({ error: "You're using an unsupported internet brand or IP." });
     }
 
     // --- RATE LIMIT (5-minute cooldown per IP) --- //
@@ -142,5 +124,6 @@ export default async function handler(req, res) {
     requestQueue.push({ req, res });
     processQueue();
 }
+
 
 
