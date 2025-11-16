@@ -11,27 +11,66 @@ function delay(ms) {
 // --- VPN CHECK USING IPHUB OR IPAPI.CO --- //
 async function isVpn(ip) {
     try {
-        const resp = await fetch(
-            `https://check.getipintel.net/check.php?ip=${ip}&contact=test@example.com&flags=m`,
-            { method: "GET" }
-        );
+        const resp = await fetch(`https://ipapi.co/${ip}/json/`);
+        const data = await resp.json();
 
-        const result = await resp.text();
+        if (!data || !data.asn) return false;
 
-        const score = parseFloat(result);
+        const asn = data.asn.toUpperCase();
+        const org = (data.org || "").toUpperCase();
 
-        // API returns negative numbers on error
-        if (isNaN(score) || score < 0) {
-            console.log("IPIntel error, allowing request");
-            return false;
+        // These keywords indicate datacenter hosting (NOT a home ISP)
+        const hostingKeywords = [
+            "HOSTING",
+            "VPN",
+            "DATACENTER",
+            "DATA CENTER",
+            "CLOUD",
+            "LLC",
+            "SERVICES",
+            "DIGITALOCEAN",
+            "AMAZON",
+            "AWS",
+            "GOOGLE",
+            "AZURE",
+            "MICROSOFT",
+            "OVH",
+            "M247",
+            "CHOOPA",
+            "LEASEWEB",
+            "FASTLY",
+            "LINODE",
+            "HETZNER"
+        ];
+
+        // If the ASN org contains these keywords → VPN/proxy/datacenter
+        for (const word of hostingKeywords) {
+            if (org.includes(word)) {
+                return true;
+            }
         }
 
-        // Score meaning:
-        // 0.90+ = VPN / Proxy / Hosting
-        return score >= 0.90;
-    } catch (e) {
-        console.log("VPN check failed:", e);
-        return false; // fail open (allow) to avoid false positives
+        // ProtonVPN specifically uses "M247 Ltd", "Datacamp Limited", "Acronis", "Steadfast", etc.
+        const protonProviders = [
+            "M247", 
+            "ACRONIS",
+            "DATACAMP",
+            "STEADFAST",
+            "ANEXIA",
+            "PRIVACY",  // used by some VPN operators
+            "PRIVATELAYER"
+        ];
+
+        for (const word of protonProviders) {
+            if (org.includes(word)) {
+                return true;
+            }
+        }
+
+        return false;
+    } catch (err) {
+        console.log("VPN check failed:", err);
+        return false;
     }
 }
 
@@ -103,4 +142,5 @@ export default async function handler(req, res) {
     requestQueue.push({ req, res });
     processQueue();
 }
+
 
